@@ -55,5 +55,5 @@ Load, explore, and analyze Rockbuster’s database to identify revenue drivers, 
 
 ## Tools Used
 
-**PostgreSQL** for the RDBMS
+**PostgreSQL** for the RDBMS  
 **SQL** for analysis
