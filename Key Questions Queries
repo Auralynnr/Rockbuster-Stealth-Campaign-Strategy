@@ -1,0 +1,184 @@
+/* ======================================================================
+Rockbuster Analysis — Combined Queries 
+Key Questions and Objectives:
+- Which movies contributed the most/least to revenue gain?
+- What was the average rental duration for all videos?
+- Which countries are Rockbuster customers based in?
+- Where are customers with a high lifetime value based?
+- Do sales figures vary between geographic regions?
+====================================================================== */
+
+
+/* ======================================================================
+Which movies contributed the most/least to revenue gain?
+-- Top and bottom revenue-generating films (two lists)
+====================================================================== */
+WITH film_revenue AS (
+  SELECT f.film_id, f.title, SUM(p.amount) AS revenue
+  FROM payment p
+  JOIN rental    r ON p.rental_id = r.rental_id
+  JOIN inventory i ON r.inventory_id = i.inventory_id
+  JOIN film      f ON i.film_id = f.film_id
+  GROUP BY f.film_id, f.title
+),
+top10 AS (
+  SELECT title, revenue
+  FROM film_revenue
+  ORDER BY revenue DESC, title
+  LIMIT 10
+),
+bottom10 AS (
+  SELECT title, revenue
+  FROM film_revenue
+  ORDER BY revenue ASC, title
+  LIMIT 10
+)
+SELECT 'TOP' AS bucket, title, revenue FROM top10
+UNION ALL
+SELECT 'BOTTOM' AS bucket, title, revenue FROM bottom10;
+
+
+/* ======================================================================
+What was the average rental duration for all videos?
+-- Average length of rentals 
+====================================================================== */
+SELECT MIN(rental_duration) AS min_duration,
+       MAX(rental_duration) AS max_duration,
+       AVG(rental_duration) AS avg_duration,
+       COUNT(rental_duration) AS count_duration_values,
+       COUNT(*) AS count_rows
+FROM film;
+
+
+/* ======================================================================
+Which countries are Rockbuster customers based in?
+-- Distinct customers per country (full list, descending)
+====================================================================== */
+SELECT country.country,
+       COUNT(DISTINCT customer.customer_id) AS count_of_cust
+FROM customer
+JOIN address ON customer.address_id = address.address_id
+JOIN city    ON address.city_id     = city.city_id
+JOIN country ON city.country_id      = country.country_id
+GROUP BY country.country
+ORDER BY count_of_cust DESC;
+
+
+/* ======================================================================
+Which countries are Rockbuster customers based in?
+-- Customers per country (Top 10, non-distinct count as stored)
+====================================================================== */
+SELECT country,
+COUNT(customer_id) AS count_of_cust
+FROM customer
+INNER JOIN address ON customer.address_id = address.address_id
+INNER JOIN city ON address.city_id = city.city_id
+INNER JOIN country ON city.country_id = country.country_id
+GROUP BY country
+ORDER BY COUNT(customer.customer_id) DESC
+LIMIT 10;
+
+
+/* ======================================================================
+Which countries are Rockbuster customers based in?
+-- Top cities by customer count within selected countries (Top 10)
+====================================================================== */
+SELECT city, country,
+COUNT(customer_id) AS count_of_cust
+FROM customer
+INNER JOIN address ON customer.address_id = address.address_id
+INNER JOIN city ON address.city_id = city.city_id
+INNER JOIN country ON city.country_id = country.country_id
+WHERE country IN ('India','China','United States','Japan','Mexico', 'Brazil','Russian Federation','Philippines','Turkey','Indonesia')
+GROUP BY country, city
+ORDER BY count_of_cust DESC
+LIMIT 10;
+
+
+/* ======================================================================
+Where are customers with a high lifetime value based?
+-- Top 5 customers by total payment in specified cities & countries
+====================================================================== */
+SELECT customer.customer_id, customer.first_name,customer.last_name,city.city, country.country,
+SUM(payment.amount) AS total_payment
+FROM customer
+INNER JOIN payment ON customer.customer_id = payment.customer_id
+INNER JOIN address ON customer.address_id = address.address_id
+INNER JOIN city ON address.city_id = city.city_id
+INNER JOIN country ON city.country_id = country.country_id
+WHERE city.city IN ('Aurora','Atlixco','Xintai','Adoni','Dhule(Dhulia)','Kurashiki','Pingxiang','Sivas','Celaya','SO leopoldo')
+AND country.country IN ('India','China','United States','Japan','Mexico', 'Brazil','Russian Federation','Philippines','Turkey','Indonesia')
+GROUP BY customer.customer_id, customer.first_name,customer.last_name,city.city, country.country
+ORDER BY total_payment DESC
+LIMIT 5;
+
+
+/* ======================================================================
+Do sales figures vary between geographic regions?
+-- Revenue by country (Top 10)
+====================================================================== */
+SELECT country.country,
+       SUM(payment.amount) AS total_payment
+FROM payment
+JOIN customer ON payment.customer_id = customer.customer_id
+JOIN address  ON customer.address_id = address.address_id
+JOIN city     ON address.city_id     = city.city_id
+JOIN country  ON city.country_id     = country.country_id
+GROUP BY country.country
+ORDER BY total_payment DESC
+LIMIT 10;
+
+
+/* ======================================================================
+Do sales figures vary between geographic regions?
+-- Revenue by country (full list, descending)
+====================================================================== */
+SELECT country.country,
+       SUM(payment.amount) AS total_payment
+FROM payment
+JOIN customer ON payment.customer_id = customer.customer_id
+JOIN address  ON customer.address_id = address.address_id
+JOIN city     ON address.city_id     = city.city_id
+JOIN country  ON city.country_id     = country.country_id
+GROUP BY country.country
+ORDER BY total_payment DESC;
+
+
+/* ======================================================================
+Additional analyses (not required for the key questions)
+-- Revenue by film category (descending)
+====================================================================== */
+SELECT category.name AS category,
+       SUM(payment.amount) AS total_payment
+FROM payment
+INNER JOIN rental        ON payment.rental_id = rental.rental_id
+INNER JOIN inventory     ON rental.inventory_id = inventory.inventory_id
+INNER JOIN film          ON inventory.film_id = film.film_id
+INNER JOIN film_category ON film.film_id = film_category.film_id
+INNER JOIN category      ON film_category.category_id = category.category_id
+GROUP BY category.name
+ORDER BY total_payment DESC;
+
+
+/* ======================================================================
+Additional analyses
+-- Revenue by film rating (descending; tiebreak by rating)
+====================================================================== */
+SELECT film.rating,
+       SUM(payment.amount) AS total_payment
+FROM payment
+JOIN rental    ON payment.rental_id   = rental.rental_id
+JOIN inventory ON rental.inventory_id = inventory.inventory_id
+JOIN film      ON inventory.film_id   = film.film_id
+GROUP BY film.rating
+ORDER BY total_payment DESC, film.rating;
+
+
+/* ======================================================================
+Additional analyses
+-- Count of films by rating
+====================================================================== */
+SELECT rating,
+       COUNT(film_id)
+FROM film
+GROUP BY rating;
